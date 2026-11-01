@@ -1,0 +1,2355 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Somake SkinVault 3D — Gerenciador & Visualizador de Skins</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #090b10;
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+
+        /* Estilo clássico de vitrine para os Cards */
+        .skin-card {
+            background: linear-gradient(180deg, rgba(22, 27, 38, 0.88) 0%, rgba(13, 16, 23, 0.96) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+            content-visibility: auto;
+            contain-intrinsic-size: 0 385px;
+        }
+        .skin-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99, 102, 241, 0.45);
+            box-shadow: 0 18px 36px -8px rgba(79, 70, 229, 0.22);
+        }
+
+        /* Vitrine do Retrato do Personagem */
+        .showcase-stage {
+            background: radial-gradient(circle at 50% 38%, rgba(99, 102, 241, 0.22) 0%, rgba(30, 27, 75, 0.12) 48%, rgba(9, 11, 16, 0.95) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .showcase-stage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+            pointer-events: none;
+        }
+        .showcase-vignette {
+            background: linear-gradient(to top, #0d1017 4%, rgba(13, 16, 23, 0.65) 24%, transparent 58%);
+        }
+
+        .pixelated {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        /* Barra de rolagem sutil para pílulas de versão */
+        .version-scroll::-webkit-scrollbar {
+            height: 3px;
+        }
+        .version-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .version-scroll::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.35);
+            border-radius: 9999px;
+        }
+
+        /* Grid dedicada de skins na área principal */
+        .skin-vault-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 1.25rem;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #090b10; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col lg:flex-row bg-[#090b10] text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+    <!-- SIDEBAR ESQUERDA UNIFICADA (SEM TOP BAR) -->
+    <aside class="w-full lg:w-[320px] lg:h-screen shrink-0 bg-[#0c0f17] border-b lg:border-b-0 lg:border-r border-slate-800/90 flex flex-col justify-between overflow-y-auto z-30 select-none">
+        <div class="p-4 space-y-4">
+            <!-- 1. Topo da Sidebar: Logo + Contadores Compactos 2x2 -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 flex items-center justify-center shadow-lg shadow-indigo-500/25 border border-indigo-400/30">
+                            <i data-lucide="box" class="w-5 h-5 text-white"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <h1 class="text-base font-extrabold tracking-tight text-white">Somake <span class="text-indigo-400">SkinVault</span></h1>
+                                <span class="px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase bg-emerald-500/15 text-emerald-300 rounded border border-emerald-500/30">3D</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Cofre & Histórico de Skins</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grade 2x2 de Contadores -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2.5">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                            <span>Jogadores / UUIDs</span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        </div>
+                        <strong id="statUniqueIds" class="text-base font-mono font-bold text-white mt-0.5 block">0</strong>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2.5">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                            <span>Versões Únicas</span>
+                            <i data-lucide="layers" class="w-3 h-3 text-indigo-400"></i>
+                        </div>
+                        <strong id="statTotalVersions" class="text-base font-mono font-bold text-indigo-300 mt-0.5 block">0</strong>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2.5">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                            <span>Dupl. Filtradas</span>
+                            <i data-lucide="shield-check" class="w-3 h-3 text-amber-400"></i>
+                        </div>
+                        <strong id="statDuplicatesFiltered" class="text-base font-mono font-bold text-amber-300 mt-0.5 block">0</strong>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2.5">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                            <span>Salvas Offline</span>
+                            <i data-lucide="hard-drive" class="w-3 h-3 text-emerald-400"></i>
+                        </div>
+                        <strong id="statHdSkins" class="text-base font-mono font-bold text-emerald-300 mt-0.5 block">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-800/80">
+
+            <!-- 2. Busca, Ordenação e Modo de Agrupamento -->
+            <div class="space-y-2.5">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Pesquisa & Exibição</label>
+                <div class="relative">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input id="searchInput" type="text" oninput="handleSearchDebounce()" placeholder="Nome, UUID, ?t= ou hash..." class="w-full pl-9 pr-7 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Alternador Agrupar por UUID vs Todas Separadas -->
+                <div class="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
+                    <button id="tabGrouped" onclick="setGroupingMode('grouped')" class="py-1.5 px-2 rounded-lg font-semibold transition bg-indigo-600 text-white truncate">
+                        Agrupar UUID
+                    </button>
+                    <button id="tabAll" onclick="setGroupingMode('all')" class="py-1.5 px-2 rounded-lg font-semibold transition text-slate-400 hover:text-white truncate">
+                        Todas Separadas
+                    </button>
+                </div>
+
+                <!-- Seletor de Ordenação -->
+                <div class="relative">
+                    <select id="sortOrder" onchange="resetAndRenderGallery()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                        <option value="newest">Ordenar: Mais Recentes</option>
+                        <option value="most_versions">Ordenar: Mais Versões</option>
+                        <option value="favorites_first">Ordenar: Favoritos Primeiro</option>
+                        <option value="name_asc">Ordenar: Nome / Apelido (A-Z)</option>
+                        <option value="oldest">Ordenar: Mais Antigas</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="border-slate-800/80">
+
+            <!-- 3. Filtros de Navegação com Contadores ao Vivo -->
+            <div class="space-y-1.5">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Filtros da Coleção</label>
+                <input type="hidden" id="filterBadge" value="all">
+
+                <button type="button" id="navFilter_all" onclick="setSidebarFilter('all')" class="w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition bg-indigo-600/20 text-indigo-300 border border-indigo-500/40">
+                    <span class="flex items-center gap-2"><i data-lucide="grid" class="w-3.5 h-3.5"></i> Todas as Skins</span>
+                    <span id="countFilter_all" class="px-1.5 py-0.5 rounded-md bg-slate-900/90 text-[10px] font-mono text-slate-300">0</span>
+                </button>
+
+                <button type="button" id="navFilter_multi" onclick="setSidebarFilter('multi')" class="w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition bg-slate-900/60 hover:bg-slate-900 text-slate-300 border border-slate-800/80">
+                    <span class="flex items-center gap-2"><i data-lucide="history" class="w-3.5 h-3.5 text-indigo-400"></i> Múltiplas Versões (v2+)</span>
+                    <span id="countFilter_multi" class="px-1.5 py-0.5 rounded-md bg-slate-950 text-[10px] font-mono text-slate-400">0</span>
+                </button>
+
+                <button type="button" id="navFilter_favorites" onclick="setSidebarFilter('favorites')" class="w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition bg-slate-900/60 hover:bg-slate-900 text-slate-300 border border-slate-800/80">
+                    <span class="flex items-center gap-2"><i data-lucide="star" class="w-3.5 h-3.5 text-amber-400"></i> Favoritas</span>
+                    <span id="countFilter_favorites" class="px-1.5 py-0.5 rounded-md bg-slate-950 text-[10px] font-mono text-slate-400">0</span>
+                </button>
+
+                <button type="button" id="navFilter_labeled" onclick="setSidebarFilter('labeled')" class="w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition bg-slate-900/60 hover:bg-slate-900 text-slate-300 border border-slate-800/80">
+                    <span class="flex items-center gap-2"><i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-400"></i> Com Nome / Apelido</span>
+                    <span id="countFilter_labeled" class="px-1.5 py-0.5 rounded-md bg-slate-950 text-[10px] font-mono text-slate-400">0</span>
+                </button>
+            </div>
+
+            <hr class="border-slate-800/80">
+
+            <!-- 4. Importação Universal (Dropzone Compacta + Gaveta Retrátil para Colar) -->
+            <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Importar Logs / JSON</label>
+                    <button type="button" onclick="loadDemoSkins()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1">
+                        <i data-lucide="wand-2" class="w-3 h-3"></i> Exemplos
+                    </button>
+                </div>
+
+                <!-- Dropzone Compacta na Sidebar -->
+                <div id="dropZone" class="border-2 border-dashed border-slate-700/80 hover:border-indigo-500/70 rounded-xl p-3.5 flex flex-col justify-center items-center text-center bg-slate-950/60 transition cursor-pointer relative">
+                    <input id="fileInput" type="file" multiple accept=".log,.txt,.json,text/plain,application/json" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleUniversalFiles(this.files)">
+                    <div class="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-1.5 text-indigo-400">
+                        <i data-lucide="file-up" class="w-4 h-4"></i>
+                    </div>
+                    <p class="text-xs font-semibold text-slate-200">Solte <span class="text-indigo-400">.json</span>, <span class="text-emerald-400">.log</span> ou <span class="text-emerald-400">.txt</span></p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Clique ou arraste backups e logs</p>
+                </div>
+
+                <!-- Botão para abrir/fechar gaveta de colar texto -->
+                <button type="button" onclick="togglePasteDrawer()" class="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-800 flex items-center justify-between transition">
+                    <span class="flex items-center gap-2"><i data-lucide="clipboard-paste" class="w-3.5 h-3.5 text-indigo-400"></i> Colar Log ou JSON Manualmente</span>
+                    <i id="pasteDrawerChevron" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform"></i>
+                </button>
+
+                <!-- Gaveta retrátil de colagem -->
+                <div id="pasteDrawer" class="hidden space-y-2 bg-slate-950/90 border border-slate-800 rounded-xl p-2.5">
+                    <textarea id="rawLogInput" rows="3" placeholder="Cole linhas de log (skins.somake.online ou skins4.somake-network.com.br) ou JSON..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-[11px] font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                    <button type="button" onclick="processPastedInput()" class="w-full py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow transition">
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                        <span>Processar & Congelar</span>
+                    </button>
+                </div>
+
+                <!-- Barra de Progresso Embutida na Sidebar -->
+                <div id="batchProgressContainer" class="hidden p-2.5 rounded-xl bg-slate-950 border border-indigo-500/30 space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span id="batchProgressText" class="text-indigo-300 font-medium truncate flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping shrink-0"></span>
+                            Processando...
+                        </span>
+                        <span id="batchProgressCount" class="font-mono text-slate-400 shrink-0">0/0</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                        <div id="batchProgressBar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 w-0 transition-all duration-150"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Rodapé da Sidebar: Ações de Manutenção & Backup -->
+        <div class="p-4 border-t border-slate-800/90 bg-[#090c12] space-y-2">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Manutenção & Backup</label>
+
+            <button type="button" onclick="runManualDeduplication()" class="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 border border-slate-800 transition">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Limpar Duplicatas Visuais</span>
+            </button>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="exportBackupJson()" class="py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition" title="Exportar Backup (.json)">
+                    <i data-lucide="download" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span>Exportar .JSON</span>
+                </button>
+
+                <label class="py-2 px-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-indigo-500/30 cursor-pointer transition" title="Importar Backup (.json)">
+                    <i data-lucide="upload" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span>Importar .JSON</span>
+                    <input id="backupFileInput" type="file" accept=".json,.log,.txt,application/json,text/plain" multiple class="hidden" onchange="handleUniversalFiles(this.files)">
+                </label>
+            </div>
+
+            <button type="button" onclick="openConfirmClearModal()" class="w-full py-1.5 px-3 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 text-xs font-medium border border-rose-800/40 flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Limpar Tudo</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL (MEIO/DIREITA) 100% DEDICADA ÀS SKINS (100VH) -->
+    <main class="flex-1 h-screen overflow-y-auto p-5 sm:p-7 bg-[#090b10]">
+        <div class="max-w-[1600px] mx-auto space-y-5">
+
+            <!-- Faixa Discreta de Status da Vitrine -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/60 text-xs text-slate-400">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <span id="galleryHeaderStatus" class="font-medium text-slate-300">Vitrine de Skins</span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400">Clique nas versões <strong class="text-indigo-300">v1, v2...</strong> para trocar no card ou no personagem para abrir em 3D</span>
+            </div>
+
+            <!-- Estado Vazio -->
+            <div id="emptyState" class="hidden py-24 text-center bg-slate-900/30 border border-dashed border-slate-800 rounded-2xl">
+                <div class="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                    <i data-lucide="ghost" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-200">Nenhuma skin encontrada para este filtro</h3>
+                <p class="text-xs text-slate-400 max-w-md mx-auto mt-1">Arraste seu arquivo <code class="text-indigo-400">.json</code> ou <code class="text-emerald-400">.log</code> na barra lateral esquerda para abastecer sua coleção.</p>
+            </div>
+
+            <!-- Grade Centralizada de Cards de Skins -->
+            <div id="skinGrid" class="skin-vault-grid"></div>
+
+            <!-- Paginação incremental -->
+            <div id="loadMoreContainer" class="hidden pt-4 pb-8 flex flex-col items-center gap-2">
+                <p id="showingCountLabel" class="text-xs text-slate-400"></p>
+                <button onclick="loadMoreCards()" class="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold border border-slate-700 transition flex items-center gap-2 shadow-lg">
+                    <i data-lucide="chevrons-down" class="w-4 h-4 text-indigo-400"></i>
+                    <span>Carregar Mais Skins</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL DE INSPEÇÃO 3D INTERATIVO -->
+    <div id="viewer3DModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+        <div class="bg-[#0e121b] border border-slate-800 rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col lg:flex-row overflow-hidden shadow-2xl">
+            
+            <!-- PALCO 3D (THREE.JS) -->
+            <div class="relative flex-1 min-h-[360px] sm:min-h-[460px] bg-gradient-to-b from-[#131826] via-[#0c1018] to-[#080a0f] flex flex-col justify-between overflow-hidden select-none">
+                <!-- Barra Superior sobre o Canvas -->
+                <div class="relative z-10 p-4 flex items-center justify-between pointer-events-none">
+                    <div class="flex items-center gap-2 pointer-events-auto">
+                        <span id="modalModelBadge" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">64x64 • STEVE</span>
+                        <span id="modalVersionCounterBadge" class="px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-slate-900/90 text-emerald-300 border border-slate-700">v1 / 1</span>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 pointer-events-auto bg-slate-900/90 border border-slate-800 p-1 rounded-xl">
+                        <button onclick="set3DAnimation('walk')" id="btnAnimWalk" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white transition">Andar</button>
+                        <button onclick="set3DAnimation('idle')" id="btnAnimIdle" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">Respirar</button>
+                        <button onclick="set3DAnimation('pose')" id="btnAnimPose" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">Estático</button>
+                    </div>
+                </div>
+
+                <!-- Container do Canvas WebGL Único -->
+                <div id="threeCanvasContainer" class="absolute inset-0 cursor-grab active:cursor-grabbing"></div>
+
+                <!-- Controles Inferiores do Palco 3D -->
+                <div class="relative z-10 p-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                    <div class="flex items-center gap-2 pointer-events-auto">
+                        <button onclick="toggleOuterLayer3D()" id="btnOuterLayer" class="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-xs font-medium text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5 transition">
+                            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                            <span>Camada 2 (Chapéu/Jaqueta): ON</span>
+                        </button>
+                        <button onclick="toggleSlimArms3D()" id="btnArmType" class="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-xs font-medium text-slate-300 border border-slate-700 transition">
+                            Braços: Clássico (4px)
+                        </button>
+                    </div>
+                    <span class="text-[11px] text-slate-400 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-slate-800/80">Arraste para girar • Scroll para zoom</span>
+                </div>
+            </div>
+
+            <!-- PAINEL LATERAL DE DETALHES E HISTÓRICO DE VERSÕES -->
+            <div class="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-slate-800/90 bg-[#0b0e16] p-5 flex flex-col justify-between overflow-y-auto max-h-[52vh] lg:max-h-none">
+                <div class="space-y-4">
+                    <!-- Cabeçalho Lateral -->
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <span class="text-[10px] font-mono uppercase tracking-wider text-indigo-400">Identificador do Jogador (UUID)</span>
+                            <h3 id="modalSkinId" class="text-sm font-mono font-bold text-white truncate"></h3>
+                        </div>
+                        <button onclick="close3DModal()" class="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Apelido / Nome Customizado -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Nome / Apelido do Jogador (salva em todas as versões)</label>
+                        <div class="flex gap-2">
+                            <input id="modalCustomLabel" type="text" placeholder="Ex: Dominicc, TazerCraft..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <button onclick="saveCustomLabelFromModal()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">Salvar</button>
+                        </div>
+                    </div>
+
+                    <!-- SELETOR DE VERSÕES NO MODAL -->
+                    <div class="bg-slate-950/90 border border-slate-800/90 rounded-xl p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                <i data-lucide="history" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                Histórico de Skins Únicas
+                            </span>
+                            <span id="modalVersionTotalText" class="text-[11px] font-mono text-slate-400"></span>
+                        </div>
+                        <div id="modalVersionList" class="space-y-1.5 max-h-40 overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <!-- Preview da Textura 2D Bruta -->
+                    <div class="bg-slate-950/90 border border-slate-800/90 rounded-xl p-3 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-14 h-14 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center p-1 overflow-hidden">
+                                <img id="modalRawTextureImg" src="" alt="Textura 2D" class="w-full h-full object-contain pixelated">
+                            </div>
+                            <div class="text-xs space-y-0.5">
+                                <p class="font-semibold text-slate-200">Textura PNG Congelada</p>
+                                <p id="modalTimestampInfo" class="font-mono text-[11px] text-slate-400"></p>
+                                <p id="modalPixelHashInfo" class="font-mono text-[10px] text-emerald-400/90"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação da Versão Selecionada -->
+                <div class="pt-4 mt-4 border-t border-slate-800/90 space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="downloadCurrentModalSkin()" class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20 transition">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Baixar PNG</span>
+                        </button>
+                        <button onclick="copyCurrentModalUrl()" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 transition">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            <span>Copiar URL</span>
+                        </button>
+                    </div>
+                    <button onclick="deleteCurrentModalVersion()" class="w-full py-2 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-medium border border-rose-800/40 flex items-center justify-center gap-1.5 transition">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Excluir Apenas Esta Versão</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO DE LIMPEZA -->
+    <div id="confirmClearModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center gap-3 text-rose-400">
+                <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <h3 class="text-base font-bold text-white">Apagar Todo o Cofre Local?</h3>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Esta ação removerá todas as skins e texturas congeladas salvas no navegador. Exporte um backup `.json` antes se quiser manter sua coleção.
+            </p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeConfirmClearModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300">Cancelar</button>
+                <button onclick="confirmClearAllData()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white">Sim, Apagar Tudo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTAINER DE NOTIFICAÇÕES (TOAST) -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <script>
+        /**************************************************************************
+         * 1. ESTADO GLOBAL & BANCO DE DADOS INDEXEDDB
+         **************************************************************************/
+        const DB_NAME = 'SomakeSkinVaultDB_v4';
+        const DB_VERSION = 1;
+        const STORE_RECORDS = 'skin_records';
+        const STORE_TEXTURES = 'skin_textures';
+
+        let dbInstance = null;
+
+        // Lista em memória de metadados (leve para ordenação e filtros instantâneos)
+        let allRecords = [];
+        // Cache em memória de texturas (recordId -> frozenDataUrl) e retratos (recordId -> frontPortraitDataUrl)
+        const textureMemoryCache = new Map();
+        const portraitMemoryCache = new Map();
+
+        // Índice de qual versão está selecionada em cada Card de jogador (skinId -> índice no array de versões daquele jogador)
+        const activeCardVersionMap = new Map();
+
+        // Contador de duplicatas visuais filtradas/mescladas na sessão
+        let totalDuplicatesFilteredCount = 0;
+
+        // Configurações de visualização da galeria
+        let groupingMode = 'grouped'; // 'grouped' (1 card por jogador com v1, v2, v3) ou 'all'
+        let currentFilteredItems = [];
+        let displayedCount = 0;
+        const PAGE_SIZE = 32;
+        let searchDebounceTimer = null;
+
+        // Observador de interseção para Lazy Rendering suave dos retratos
+        let cardIntersectionObserver = null;
+
+        // Estado do Modal 3D
+        let currentModalSkinId = null;
+        let currentModalVersionIdx = 0;
+
+        function openDatabase() {
+            return new Promise((resolve, reject) => {
+                if (dbInstance) return resolve(dbInstance);
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_RECORDS)) {
+                        db.createObjectStore(STORE_RECORDS, { keyPath: 'recordId' });
+                    }
+                    if (!db.objectStoreNames.contains(STORE_TEXTURES)) {
+                        db.createObjectStore(STORE_TEXTURES, { keyPath: 'recordId' });
+                    }
+                };
+                request.onsuccess = (e) => {
+                    dbInstance = e.target.result;
+                    resolve(dbInstance);
+                };
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function saveRecordAndTextureToDB(recordMeta, frozenDataUrl, portraitDataUrl) {
+            const db = await openDatabase();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([STORE_RECORDS, STORE_TEXTURES], 'readwrite');
+                tx.objectStore(STORE_RECORDS).put(recordMeta);
+                if (frozenDataUrl) {
+                    tx.objectStore(STORE_TEXTURES).put({
+                        recordId: recordMeta.recordId,
+                        frozenDataUrl,
+                        portraitDataUrl: portraitDataUrl || null
+                    });
+                    textureMemoryCache.set(recordMeta.recordId, frozenDataUrl);
+                    if (portraitDataUrl) portraitMemoryCache.set(recordMeta.recordId, portraitDataUrl);
+                }
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function updateRecordMetaInDB(recordMeta) {
+            const db = await openDatabase();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction([STORE_RECORDS], 'readwrite');
+                tx.objectStore(STORE_RECORDS).put(recordMeta);
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function getTextureFromDB(recordId) {
+            if (textureMemoryCache.has(recordId)) {
+                return {
+                    frozenDataUrl: textureMemoryCache.get(recordId),
+                    portraitDataUrl: portraitMemoryCache.get(recordId) || null
+                };
+            }
+            const db = await openDatabase();
+            return new Promise((resolve) => {
+                const tx = db.transaction([STORE_TEXTURES], 'readonly');
+                const req = tx.objectStore(STORE_TEXTURES).get(recordId);
+                req.onsuccess = () => {
+                    if (req.result && req.result.frozenDataUrl) {
+                        textureMemoryCache.set(recordId, req.result.frozenDataUrl);
+                        if (req.result.portraitDataUrl) {
+                            portraitMemoryCache.set(recordId, req.result.portraitDataUrl);
+                        }
+                        resolve(req.result);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        async function deleteRecordFromDB(recordId) {
+            const db = await openDatabase();
+            return new Promise((resolve) => {
+                const tx = db.transaction([STORE_RECORDS, STORE_TEXTURES], 'readwrite');
+                tx.objectStore(STORE_RECORDS).delete(recordId);
+                tx.objectStore(STORE_TEXTURES).delete(recordId);
+                textureMemoryCache.delete(recordId);
+                portraitMemoryCache.delete(recordId);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        async function loadAllRecordsFromDB() {
+            const db = await openDatabase();
+            return new Promise((resolve) => {
+                const tx = db.transaction([STORE_RECORDS], 'readonly');
+                const req = tx.objectStore(STORE_RECORDS).getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => resolve([]);
+            });
+        }
+
+        /**************************************************************************
+         * 2. HASH DE PIXELS (DEDUPLICAÇÃO EXATA) & RETRATO CLÁSSICO DE VITRINE
+         **************************************************************************/
+        const hashCanvas = document.createElement('canvas');
+        const hashCtx = hashCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Calcula FNV-1a 64-bit em hexadecimal dos pixels reais da imagem da skin
+        function computePixelHashAndDimensions(imgElement) {
+            const w = imgElement.naturalWidth || imgElement.width || 64;
+            const h = imgElement.naturalHeight || imgElement.height || 64;
+            hashCanvas.width = w;
+            hashCanvas.height = h;
+            hashCtx.clearRect(0, 0, w, h);
+            hashCtx.drawImage(imgElement, 0, 0);
+
+            const data = hashCtx.getImageData(0, 0, w, h).data;
+            let h1 = 0x811c9dc5;
+            let h2 = 0xcbf29ce4;
+            for (let i = 0; i < data.length; i += 4) {
+                const a = data[i + 3];
+                // Ignora diferenças invisíveis em pixels 100% transparentes
+                const r = a === 0 ? 0 : data[i];
+                const g = a === 0 ? 0 : data[i + 1];
+                const b = a === 0 ? 0 : data[i + 2];
+
+                h1 ^= r; h1 = Math.imul(h1, 0x01000193);
+                h1 ^= g; h1 = Math.imul(h1, 0x01000193);
+                h2 ^= b; h2 = Math.imul(h2, 0x01000193);
+                h2 ^= a; h2 = Math.imul(h2, 0x01000193);
+            }
+            const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
+            const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
+            return {
+                pixelHash: `${w}x${h}_${hex1}${hex2}`,
+                width: w,
+                height: h,
+                isHD: w > 64 || h > 64
+            };
+        }
+
+        // Gera o retrato clássico frontal do personagem (Cabeça + Chapéu + Tronco + Braços + Pernas com proporção correta)
+        const portraitCanvas = document.createElement('canvas');
+        portraitCanvas.width = 160;
+        portraitCanvas.height = 220;
+        const portraitCtx = portraitCanvas.getContext('2d');
+
+        function generateClassicFrontPortrait(imgElement) {
+            const w = imgElement.naturalWidth || imgElement.width || 64;
+            const h = imgElement.naturalHeight || imgElement.height || 64;
+            const scale = w / 64; // Suporta 64x64, 128x128, 256x256 etc.
+            const isLegacy64x32 = (h * 2 === w);
+
+            portraitCtx.clearRect(0, 0, 160, 220);
+            portraitCtx.imageSmoothingEnabled = false;
+
+            const u = (val) => Math.round(val * scale);
+            // Escala de desenho: 1 unidade de pixel base = 7px no canvas (16 * 7 = 112px largura total)
+            const P = 7;
+            const startX = 24; // Centralizado em 160px
+            const startY = 12;
+
+            // Sombra suave atrás do personagem para destacar na vitrine
+            portraitCtx.save();
+            portraitCtx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+            portraitCtx.shadowBlur = 14;
+            portraitCtx.shadowOffsetY = 6;
+
+            // 1. Cabeça Base (8x8)
+            portraitCtx.drawImage(imgElement, u(8), u(8), u(8), u(8), startX + 4 * P, startY, 8 * P, 8 * P);
+
+            // 2. Tronco Base (8x12)
+            portraitCtx.drawImage(imgElement, u(20), u(20), u(8), u(12), startX + 4 * P, startY + 8 * P, 8 * P, 12 * P);
+
+            // 3. Braço Direito (4x12)
+            portraitCtx.drawImage(imgElement, u(44), u(20), u(4), u(12), startX, startY + 8 * P, 4 * P, 12 * P);
+
+            // 4. Braço Esquerdo (4x12)
+            if (isLegacy64x32) {
+                portraitCtx.save();
+                portraitCtx.translate(startX + 16 * P, startY + 8 * P);
+                portraitCtx.scale(-1, 1);
+                portraitCtx.drawImage(imgElement, u(44), u(20), u(4), u(12), 0, 0, 4 * P, 12 * P);
+                portraitCtx.restore();
+            } else {
+                portraitCtx.drawImage(imgElement, u(36), u(52), u(4), u(12), startX + 12 * P, startY + 8 * P, 4 * P, 12 * P);
+            }
+
+            // 5. Perna Direita (4x12)
+            portraitCtx.drawImage(imgElement, u(4), u(20), u(4), u(12), startX + 4 * P, startY + 20 * P, 4 * P, 12 * P);
+
+            // 6. Perna Esquerda (4x12)
+            if (isLegacy64x32) {
+                portraitCtx.save();
+                portraitCtx.translate(startX + 12 * P, startY + 20 * P);
+                portraitCtx.scale(-1, 1);
+                portraitCtx.drawImage(imgElement, u(4), u(20), u(4), u(12), 0, 0, 4 * P, 12 * P);
+                portraitCtx.restore();
+            } else {
+                portraitCtx.drawImage(imgElement, u(20), u(52), u(4), u(12), startX + 8 * P, startY + 20 * P, 4 * P, 12 * P);
+            }
+            portraitCtx.restore();
+
+            // CAMADAS SECUNDÁRIAS (Chapéu, Jaqueta, Mangas e Calças 3D)
+            // Chapéu (Head Overlay) ligeiramente expandido
+            portraitCtx.drawImage(imgElement, u(40), u(8), u(8), u(8), startX + 4 * P - 3, startY - 3, 8 * P + 6, 8 * P + 6);
+
+            if (!isLegacy64x32) {
+                // Jaqueta (Body Overlay)
+                portraitCtx.drawImage(imgElement, u(20), u(36), u(8), u(12), startX + 4 * P, startY + 8 * P, 8 * P, 12 * P);
+                // Manga Direita
+                portraitCtx.drawImage(imgElement, u(44), u(36), u(4), u(12), startX, startY + 8 * P, 4 * P, 12 * P);
+                // Manga Esquerda
+                portraitCtx.drawImage(imgElement, u(52), u(52), u(4), u(12), startX + 12 * P, startY + 8 * P, 4 * P, 12 * P);
+                // Calça Direita
+                portraitCtx.drawImage(imgElement, u(4), u(36), u(4), u(12), startX + 4 * P, startY + 20 * P, 4 * P, 12 * P);
+                // Calça Esquerda
+                portraitCtx.drawImage(imgElement, u(4), u(52), u(4), u(12), startX + 8 * P, startY + 20 * P, 4 * P, 12 * P);
+            }
+
+            return portraitCanvas.toDataURL('image/png');
+        }
+
+        function loadImageFromDataUrlOrRemote(srcUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = (err) => reject(err);
+                img.src = srcUrl;
+            });
+        }
+
+        /**************************************************************************
+         * 3. REINDEXAÇÃO DE VERSÕES E DEDUPLICAÇÃO POR JOGADOR (UUID)
+         **************************************************************************/
+        // Recalcula versionNumber (v1, v2, v3...) cronologicamente para cada skinId
+        function recalculateVersionNumbersForSkinId(skinId) {
+            const list = allRecords.filter(r => r.skinId === skinId);
+            list.sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+            list.forEach((rec, idx) => {
+                rec.versionNumber = idx + 1;
+            });
+        }
+
+        // Agrupa registros por skinId para os Cards
+        function getGroupedPlayersMap() {
+            const groups = new Map();
+            for (const rec of allRecords) {
+                if (!groups.has(rec.skinId)) {
+                    groups.set(rec.skinId, []);
+                }
+                groups.get(rec.skinId).push(rec);
+            }
+            for (const [skinId, versions] of groups.entries()) {
+                versions.sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+                versions.forEach((v, i) => { v.versionNumber = i + 1; });
+            }
+            return groups;
+        }
+
+        /**************************************************************************
+         * 4. IMPORTADOR UNIVERSAL (.JSON DE BACKUP E .LOG / .TXT)
+         **************************************************************************/
+        // Aceita tanto arquivos .json (formato antigo de Array direto ou novo) quanto .log/.txt
+        async function handleUniversalFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            const files = Array.from(fileList);
+
+            for (const file of files) {
+                const text = await file.text();
+                const trimmed = text.trim();
+
+                // Detecta automaticamente se é um arquivo JSON de backup
+                if (file.name.toLowerCase().endsWith('.json') || trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        await importParsedBackupJson(parsed, file.name);
+                        continue;
+                    } catch (err) {
+                        console.warn('Arquivo não é um JSON válido, tentando extrair URLs de log...', err);
+                    }
+                }
+
+                // Caso contrário, extrai links de skin do texto de log
+                await extractAndProcessLogUrls(text, file.name);
+            }
+
+            // Limpa os inputs para permitir reenviar o mesmo arquivo se desejar
+            const f1 = document.getElementById('fileInput');
+            const f2 = document.getElementById('backupFileInput');
+            if (f1) f1.value = '';
+            if (f2) f2.value = '';
+        }
+
+        async function processPastedInput() {
+            const inputEl = document.getElementById('rawLogInput');
+            const raw = (inputEl.value || '').trim();
+            if (!raw) {
+                showToast('Cole o texto do log ou o conteúdo do backup JSON primeiro.', 'amber');
+                return;
+            }
+
+            // Verifica se o usuário colou um JSON direto na caixa de texto
+            if (raw.startsWith('[') || raw.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    await importParsedBackupJson(parsed, 'JSON Colado');
+                    inputEl.value = '';
+                    return;
+                } catch (e) {
+                    // Continua como log normal
+                }
+            }
+
+            await extractAndProcessLogUrls(raw, 'Texto Colado');
+            inputEl.value = '';
+        }
+
+        // Importa todos os formatos possíveis de Backup JSON (Array direto, {records, textures}, {skins}, etc.)
+        async function importParsedBackupJson(parsedData, sourceLabel = 'Backup JSON') {
+            let rawItems = [];
+            let externalTexturesMap = {};
+
+            if (Array.isArray(parsedData)) {
+                // Formato anexado pelo usuário: Array JSON direto [ { recordId, skinId, frozenDataUrl, ... }, ... ]
+                rawItems = parsedData;
+            } else if (parsedData && typeof parsedData === 'object') {
+                if (Array.isArray(parsedData.records)) rawItems = parsedData.records;
+                else if (Array.isArray(parsedData.skins)) rawItems = parsedData.skins;
+                else if (Array.isArray(parsedData.items)) rawItems = parsedData.items;
+                else if (Array.isArray(parsedData.data)) rawItems = parsedData.data;
+
+                if (parsedData.textures && typeof parsedData.textures === 'object') {
+                    externalTexturesMap = parsedData.textures;
+                }
+            }
+
+            if (!rawItems || rawItems.length === 0) {
+                showToast('Nenhum registro de skin encontrado no arquivo JSON.', 'rose');
+                return;
+            }
+
+            showProgress(true, `Importando ${rawItems.length} skins de ${sourceLabel}...`, 0, rawItems.length);
+
+            let importedCount = 0;
+            let skippedDuplicatePixels = 0;
+            let updatedLabels = 0;
+
+            // Mapa rápido de hashes já existentes por jogador: Map<skinId, Set<pixelHash>>
+            const existingHashesBySkinId = new Map();
+            for (const rec of allRecords) {
+                if (!existingHashesBySkinId.has(rec.skinId)) {
+                    existingHashesBySkinId.set(rec.skinId, new Set());
+                }
+                if (rec.pixelHash) {
+                    existingHashesBySkinId.get(rec.skinId).add(rec.pixelHash);
+                }
+            }
+
+            const CHUNK_SIZE = 8;
+            for (let i = 0; i < rawItems.length; i++) {
+                const item = rawItems[i];
+                if (!item || typeof item !== 'object') continue;
+
+                const skinId = String(item.skinId || item.uuid || item.id || '').trim();
+                if (!skinId) continue;
+
+                const timestampParam = String(item.timestampParam || item.timestamp || 'sem-timestamp').trim();
+                const recordId = String(item.recordId || `${skinId}_${timestampParam}`);
+                const frozenDataUrl = item.frozenDataUrl || item.dataUrl || externalTexturesMap[recordId] || null;
+
+                if (!frozenDataUrl) continue;
+
+                try {
+                    // Carrega a imagem do base64 para garantir hash de pixels real e gerar o retrato frontal clássico
+                    const img = await loadImageFromDataUrlOrRemote(frozenDataUrl);
+                    const { pixelHash, width, height, isHD } = computePixelHashAndDimensions(img);
+
+                    if (!existingHashesBySkinId.has(skinId)) {
+                        existingHashesBySkinId.set(skinId, new Set());
+                    }
+                    const skinHashSet = existingHashesBySkinId.get(skinId);
+
+                    // Verifica se este jogador já possui exatamente esta mesma pintura de skin
+                    if (skinHashSet.has(pixelHash)) {
+                        skippedDuplicatePixels++;
+                        totalDuplicatesFilteredCount++;
+                        // Se o item duplicado tinha um customLabel (ex: "Dominicc") ou era favorito, preserva no registro existente
+                        if (item.customLabel || item.isFavorite) {
+                            for (const existingRec of allRecords) {
+                                if (existingRec.skinId === skinId) {
+                                    let changed = false;
+                                    if (item.customLabel && !existingRec.customLabel) {
+                                        existingRec.customLabel = item.customLabel;
+                                        changed = true;
+                                    }
+                                    if (item.isFavorite && !existingRec.isFavorite) {
+                                        existingRec.isFavorite = true;
+                                        changed = true;
+                                    }
+                                    if (changed) {
+                                        await updateRecordMetaInDB(existingRec);
+                                        updatedLabels++;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        skinHashSet.add(pixelHash);
+                        const portraitDataUrl = generateClassicFrontPortrait(img);
+
+                        const parsedCreatedMs = Number(item.createdAtMs) ||
+                            (Number(timestampParam) > 1000000000 ? Number(timestampParam) : Date.now() + i);
+
+                        const newRecordMeta = {
+                            recordId,
+                            skinId,
+                            timestampParam,
+                            originalUrl: item.originalUrl || `https://skins.somake.online/skin/${skinId}${timestampParam !== 'sem-timestamp' ? '?t=' + timestampParam : ''}`,
+                            width: item.width || width,
+                            height: item.height || height,
+                            isHD: typeof item.isHD === 'boolean' ? item.isHD : isHD,
+                            pixelHash,
+                            versionNumber: 1,
+                            isFavorite: Boolean(item.isFavorite),
+                            customLabel: String(item.customLabel || '').trim(),
+                            addedAt: item.addedAt || new Date(parsedCreatedMs).toLocaleString('pt-BR'),
+                            createdAtMs: parsedCreatedMs
+                        };
+
+                        // Propaga o nome do jogador para todas as versões do mesmo skinId
+                        if (newRecordMeta.customLabel) {
+                            for (const r of allRecords) {
+                                if (r.skinId === skinId && !r.customLabel) {
+                                    r.customLabel = newRecordMeta.customLabel;
+                                    await updateRecordMetaInDB(r);
+                                }
+                            }
+                        } else {
+                            const existingWithName = allRecords.find(r => r.skinId === skinId && r.customLabel);
+                            if (existingWithName) {
+                                newRecordMeta.customLabel = existingWithName.customLabel;
+                            }
+                        }
+
+                        allRecords.push(newRecordMeta);
+                        recalculateVersionNumbersForSkinId(skinId);
+                        // Aponta o card para a versão mais recente por padrão
+                        const totalVers = allRecords.filter(r => r.skinId === skinId).length;
+                        activeCardVersionMap.set(skinId, totalVers - 1);
+
+                        await saveRecordAndTextureToDB(newRecordMeta, frozenDataUrl, portraitDataUrl);
+                        importedCount++;
+                    }
+                } catch (err) {
+                    console.warn('Erro ao processar item do backup:', recordId, err);
+                }
+
+                if ((i + 1) % CHUNK_SIZE === 0 || i === rawItems.length - 1) {
+                    showProgress(true, `Importando e gerando retratos (${i + 1}/${rawItems.length})...`, i + 1, rawItems.length);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            showProgress(false);
+            updateStatsBar();
+            resetAndRenderGallery();
+
+            showToast(
+                `Backup importado! +${importedCount} skins adicionadas` +
+                (skippedDuplicatePixels > 0 ? ` (${skippedDuplicatePixels} duplicatas idênticas mescladas)` : ''),
+                'emerald'
+            );
+        }
+        // Extrai URLs de arquivos .log / .txt (Suporta skins.somake.online e skins4.somake-network.com.br/texture/)
+        async function extractAndProcessLogUrls(rawText, sourceName) {
+            const regex = /https?:\/\/(?:skins\.somake\.online\/skin|skins\d*\.somake-network\.com\.br\/texture)\/([a-zA-Z0-9_-]+)\/?(?:\?t=([0-9]+))?/gi;
+            const matches = [];
+            const seenUrlKeys = new Set();
+
+            let match;
+            while ((match = regex.exec(rawText)) !== null) {
+                const fullUrl = match[0];
+                const skinId = match[1];
+                const timestampParam = match[2] || 'sem-timestamp';
+                const key = `${skinId}_${timestampParam}`;
+                if (!seenUrlKeys.has(key)) {
+                    seenUrlKeys.add(key);
+                    matches.push({ fullUrl, skinId, timestampParam, recordId: key });
+                }
+            }
+
+            if (matches.length === 0) {
+                showToast(`Nenhuma URL Somake encontrada em ${sourceName}.`, 'amber');
+                return;
+            }
+
+            showProgress(true, `Baixando e congelando ${matches.length} skins de ${sourceName}...`, 0, matches.length);
+
+            let addedCount = 0;
+            let skippedDuplicates = 0;
+            let failedCount = 0;
+
+            for (let i = 0; i < matches.length; i++) {
+                const item = matches[i];
+                showProgress(true, `Congelando skin ${i + 1} de ${matches.length}...`, i + 1, matches.length);
+
+                try {
+                    const img = await fetchSkinImageWithFallback(item.fullUrl);
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = img.naturalWidth || 64;
+                    tempCanvas.height = img.naturalHeight || 64;
+                    tempCanvas.getContext('2d').drawImage(img, 0, 0);
+                    const frozenDataUrl = tempCanvas.toDataURL('image/png');
+
+                    const { pixelHash, width, height, isHD } = computePixelHashAndDimensions(img);
+
+                    // Verifica se esse jogador já possui uma versão com o mesmo pixelHash
+                    const duplicateExists = allRecords.some(r => r.skinId === item.skinId && r.pixelHash === pixelHash);
+                    if (duplicateExists) {
+                        skippedDuplicates++;
+                        totalDuplicatesFilteredCount++;
+                        continue;
+                    }
+
+                    const portraitDataUrl = generateClassicFrontPortrait(img);
+                    const existingWithName = allRecords.find(r => r.skinId === item.skinId && r.customLabel);
+                    const createdAtMs = Number(item.timestampParam) > 1000000000 ? Number(item.timestampParam) : Date.now() + i;
+
+                    const recordMeta = {
+                        recordId: item.recordId,
+                        skinId: item.skinId,
+                        timestampParam: item.timestampParam,
+                        originalUrl: item.fullUrl,
+                        width,
+                        height,
+                        isHD,
+                        pixelHash,
+                        versionNumber: 1,
+                        isFavorite: false,
+                        customLabel: existingWithName ? existingWithName.customLabel : '',
+                        addedAt: new Date().toLocaleString('pt-BR'),
+                        createdAtMs
+                    };
+
+                    allRecords.push(recordMeta);
+                    recalculateVersionNumbersForSkinId(item.skinId);
+                    const totalVers = allRecords.filter(r => r.skinId === item.skinId).length;
+                    activeCardVersionMap.set(item.skinId, totalVers - 1);
+
+                    await saveRecordAndTextureToDB(recordMeta, frozenDataUrl, portraitDataUrl);
+                    addedCount++;
+                } catch (err) {
+                    failedCount++;
+                }
+            }
+
+            showProgress(false);
+            updateStatsBar();
+            resetAndRenderGallery();
+
+            showToast(
+                `Processamento concluído: +${addedCount} novas skins` +
+                (skippedDuplicates > 0 ? `, ${skippedDuplicates} idênticas ignoradas` : '') +
+                (failedCount > 0 ? `, ${failedCount} offline` : ''),
+                addedCount > 0 ? 'emerald' : 'indigo'
+            );
+        }
+
+        async function fetchSkinImageWithFallback(url) {
+            const tries = [
+                url,
+                `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            ];
+            for (const attemptUrl of tries) {
+                try {
+                    const res = await fetch(attemptUrl, { cache: 'no-store' });
+                    if (!res.ok) continue;
+                    const blob = await res.blob();
+                    const objUrl = URL.createObjectURL(blob);
+                    const img = await loadImageFromDataUrlOrRemote(objUrl);
+                    URL.revokeObjectURL(objUrl);
+                    return img;
+                } catch (e) {}
+            }
+            throw new Error('Não foi possível baixar a textura da URL');
+        }
+
+        /**************************************************************************
+         * 5. RENDERIZAÇÃO DOS CARDS (VITRINE CLÁSSICA + TROCA DE VERSÃO v1, v2, v3 NO CARD)
+         **************************************************************************/
+        function setGroupingMode(mode) {
+            groupingMode = mode;
+            const btnGrouped = document.getElementById('tabGrouped');
+            const btnAll = document.getElementById('tabAll');
+            if (mode === 'grouped') {
+                btnGrouped.className = 'py-1.5 px-2 rounded-lg font-semibold transition bg-indigo-600 text-white truncate';
+                btnAll.className = 'py-1.5 px-2 rounded-lg font-semibold transition text-slate-400 hover:text-white truncate';
+            } else {
+                btnAll.className = 'py-1.5 px-2 rounded-lg font-semibold transition bg-indigo-600 text-white truncate';
+                btnGrouped.className = 'py-1.5 px-2 rounded-lg font-semibold transition text-slate-400 hover:text-white truncate';
+            }
+            resetAndRenderGallery();
+        }
+
+        function setSidebarFilter(filterKey) {
+            document.getElementById('filterBadge').value = filterKey;
+            const keys = ['all', 'multi', 'favorites', 'labeled'];
+            keys.forEach(k => {
+                const btn = document.getElementById(`navFilter_${k}`);
+                if (!btn) return;
+                if (k === filterKey) {
+                    btn.className = 'w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition bg-indigo-600/20 text-indigo-300 border border-indigo-500/40';
+                } else {
+                    btn.className = 'w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition bg-slate-900/60 hover:bg-slate-900 text-slate-300 border border-slate-800/80';
+                }
+            });
+            resetAndRenderGallery();
+        }
+
+        function togglePasteDrawer() {
+            const drawer = document.getElementById('pasteDrawer');
+            const chevron = document.getElementById('pasteDrawerChevron');
+            const isHidden = drawer.classList.toggle('hidden');
+            if (chevron) {
+                chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+            }
+        }
+
+        function handleSearchDebounce() {
+            const val = document.getElementById('searchInput').value;
+            document.getElementById('clearSearchBtn').classList.toggle('hidden', !val);
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                resetAndRenderGallery();
+            }, 120);
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            resetAndRenderGallery();
+        }
+
+        function resetAndRenderGallery() {
+            const query = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+            const badgeFilter = document.getElementById('filterBadge').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+
+            const groupsMap = getGroupedPlayersMap();
+            let items = [];
+
+            if (groupingMode === 'grouped') {
+                // Cada item representa 1 Jogador (UUID) com todas as suas versões [v1, v2, v3...]
+                for (const [skinId, versions] of groupsMap.entries()) {
+                    const activeIdx = Math.min(
+                        activeCardVersionMap.has(skinId) ? activeCardVersionMap.get(skinId) : versions.length - 1,
+                        versions.length - 1
+                    );
+                    activeCardVersionMap.set(skinId, Math.max(0, activeIdx));
+                    items.push({
+                        isGroupCard: true,
+                        skinId,
+                        versions,
+                        latestCreatedAtMs: versions[versions.length - 1].createdAtMs || 0,
+                        oldestCreatedAtMs: versions[0].createdAtMs || 0,
+                        hasFavorite: versions.some(v => v.isFavorite),
+                        customLabel: versions.find(v => v.customLabel)?.customLabel || ''
+                    });
+                }
+            } else {
+                // Modo desagrupado: cada versão é um card individual
+                for (const [skinId, versions] of groupsMap.entries()) {
+                    versions.forEach((v, idx) => {
+                        items.push({
+                            isGroupCard: false,
+                            skinId,
+                            versions,
+                            fixedVersionIdx: idx,
+                            latestCreatedAtMs: v.createdAtMs || 0,
+                            oldestCreatedAtMs: v.createdAtMs || 0,
+                            hasFavorite: Boolean(v.isFavorite),
+                            customLabel: v.customLabel || ''
+                        });
+                    });
+                }
+            }
+
+            // Aplica filtros
+            items = items.filter(entry => {
+                const activeVer = entry.isGroupCard
+                    ? entry.versions[activeCardVersionMap.get(entry.skinId) || 0]
+                    : entry.versions[entry.fixedVersionIdx];
+
+                if (query) {
+                    const matchId = entry.skinId.toLowerCase().includes(query);
+                    const matchLabel = (entry.customLabel || '').toLowerCase().includes(query);
+                    const matchTs = entry.versions.some(v => (v.timestampParam || '').toLowerCase().includes(query));
+                    const matchHash = entry.versions.some(v => (v.pixelHash || '').toLowerCase().includes(query));
+                    if (!matchId && !matchLabel && !matchTs && !matchHash) return false;
+                }
+
+                if (badgeFilter === 'favorites' && !entry.versions.some(v => v.isFavorite)) return false;
+                if (badgeFilter === 'multi' && entry.versions.length < 2) return false;
+                if (badgeFilter === 'hd' && !activeVer.isHD) return false;
+                if (badgeFilter === 'sd' && activeVer.isHD) return false;
+                if (badgeFilter === 'labeled' && !entry.customLabel) return false;
+
+                return true;
+            });
+
+            // Ordenação
+            items.sort((a, b) => {
+                if (sortOrder === 'newest') return b.latestCreatedAtMs - a.latestCreatedAtMs;
+                if (sortOrder === 'oldest') return a.oldestCreatedAtMs - b.oldestCreatedAtMs;
+                if (sortOrder === 'most_versions') return b.versions.length - a.versions.length || (b.latestCreatedAtMs - a.latestCreatedAtMs);
+                if (sortOrder === 'favorites_first') {
+                    if (a.hasFavorite !== b.hasFavorite) return a.hasFavorite ? -1 : 1;
+                    return b.latestCreatedAtMs - a.latestCreatedAtMs;
+                }
+                if (sortOrder === 'name_asc') {
+                    const nameA = (a.customLabel || a.skinId).toLowerCase();
+                    const nameB = (b.customLabel || b.skinId).toLowerCase();
+                    return nameA.localeCompare(nameB, 'pt-BR');
+                }
+                return 0;
+            });
+
+            currentFilteredItems = items;
+            displayedCount = 0;
+
+            const statusEl = document.getElementById('galleryHeaderStatus');
+            if (statusEl) {
+                statusEl.textContent = `Exibindo ${items.length} ${groupingMode === 'grouped' ? 'jogadores (UUIDs)' : 'versões'} na vitrine`;
+            }
+
+            const grid = document.getElementById('skinGrid');
+            grid.innerHTML = '';
+
+            document.getElementById('emptyState').classList.toggle('hidden', currentFilteredItems.length > 0);
+            loadMoreCards();
+        }
+
+        function loadMoreCards() {
+            const grid = document.getElementById('skinGrid');
+            const nextSlice = currentFilteredItems.slice(displayedCount, displayedCount + PAGE_SIZE);
+
+            const fragment = document.createDocumentFragment();
+            for (const entry of nextSlice) {
+                const cardEl = createSkinCardElement(entry);
+                fragment.appendChild(cardEl);
+            }
+            grid.appendChild(fragment);
+            displayedCount += nextSlice.length;
+
+            const loadMoreContainer = document.getElementById('loadMoreContainer');
+            const showingCountLabel = document.getElementById('showingCountLabel');
+            if (displayedCount < currentFilteredItems.length) {
+                loadMoreContainer.classList.remove('hidden');
+                showingCountLabel.textContent = `Exibindo ${displayedCount} de ${currentFilteredItems.length} cards`;
+            } else {
+                loadMoreContainer.classList.add('hidden');
+            }
+
+            lucide.createIcons();
+        }
+
+        // Cria o Card com o visual clássico de vitrine + barra interativa de versões (v1, v2, v3 + setas < >)
+        function createSkinCardElement(entry) {
+            const skinId = entry.skinId;
+            const versions = entry.versions;
+            const currentVerIdx = entry.isGroupCard
+                ? Math.min(activeCardVersionMap.get(skinId) ?? (versions.length - 1), versions.length - 1)
+                : entry.fixedVersionIdx;
+
+            const currentVer = versions[currentVerIdx];
+            const cardKey = entry.isGroupCard ? `group_${skinId}` : `single_${currentVer.recordId}`;
+
+            const article = document.createElement('article');
+            article.className = 'skin-card rounded-2xl overflow-hidden flex flex-col justify-between group';
+            article.dataset.cardKey = cardKey;
+            article.dataset.skinId = skinId;
+            article.dataset.recordId = currentVer.recordId;
+
+            article.innerHTML = buildCardInnerHtml(entry, currentVerIdx);
+            observeCardForPortraitHydration(article, currentVer);
+
+            return article;
+        }
+
+        function buildCardInnerHtml(entry, currentVerIdx) {
+            const skinId = entry.skinId;
+            const versions = entry.versions;
+            const currentVer = versions[currentVerIdx];
+            const totalVersions = versions.length;
+
+            const displayTitle = currentVer.customLabel || entry.customLabel || skinId;
+            const subtitleUuid = (currentVer.customLabel || entry.customLabel) ? skinId : `UUID • ${skinId.slice(0, 16)}...`;
+            const resBadgeClass = currentVer.isHD
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : 'bg-slate-900/85 text-slate-300 border-slate-700/80';
+            const resLabel = currentVer.isHD ? `✨ HD ${currentVer.width}x${currentVer.height}` : `${currentVer.width}x${currentVer.height}`;
+
+            // Constrói as pílulas v1, v2, v3... para troca direta no Card SEM abrir o modal 3D
+            let versionSwitcherHtml = '';
+            if (entry.isGroupCard && totalVersions > 1) {
+                const pills = versions.map((v, idx) => {
+                    const isActive = idx === currentVerIdx;
+                    const activeClass = isActive
+                        ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-500/40 font-bold'
+                        : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200';
+                    return `<button type="button" onclick="switchCardVersion(event, '${skinId}', ${idx})" class="px-2 py-0.5 rounded-md text-[11px] font-mono border transition shrink-0 ${activeClass}" title="Ver versão v${idx + 1} (${v.timestampParam})">v${idx + 1}</button>`;
+                }).join('');
+
+                const prevIdx = (currentVerIdx - 1 + totalVersions) % totalVersions;
+                const nextIdx = (currentVerIdx + 1) % totalVersions;
+
+                versionSwitcherHtml = `
+                    <div class="mt-2.5 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-1.5" onclick="event.stopPropagation()">
+                        <button type="button" onclick="switchCardVersion(event, '${skinId}', ${prevIdx})" class="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shrink-0" title="Versão anterior">
+                            <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <div class="flex items-center gap-1 overflow-x-auto version-scroll py-0.5 px-0.5">
+                            ${pills}
+                        </div>
+                        <button type="button" onclick="switchCardVersion(event, '${skinId}', ${nextIdx})" class="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shrink-0" title="Próxima versão">
+                            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                `;
+            } else {
+                versionSwitcherHtml = `
+                    <div class="mt-2.5 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span class="px-2 py-0.5 rounded-md bg-slate-900/90 border border-slate-800 text-indigo-300">v${currentVer.versionNumber || 1} única</span>
+                        <span class="truncate max-w-[140px]" title="${currentVer.addedAt || ''}">${currentVer.addedAt ? currentVer.addedAt.split(',')[0] : ''}</span>
+                    </div>
+                `;
+            }
+
+            return `
+                <!-- VITRINE CLÁSSICA DO PERSONAGEM (CLICAR AQUI ABRE O 3D) -->
+                <div class="showcase-stage h-52 w-full flex items-center justify-center cursor-pointer relative" onclick="open3DModal('${skinId}', ${currentVerIdx})">
+                    
+                    <!-- Badges Superiores Esquerda -->
+                    <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5">
+                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border backdrop-blur-md ${resBadgeClass}">
+                            ${resLabel}
+                        </span>
+                        ${totalVersions > 1 ? `
+                            <span class="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 backdrop-blur-md">
+                                v${currentVerIdx + 1}/${totalVersions}
+                            </span>
+                        ` : ''}
+                    </div>
+
+                    <!-- Botão Favoritar Superior Direita -->
+                    <button type="button" onclick="toggleFavoriteOnCard(event, '${currentVer.recordId}', '${skinId}')" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-xl bg-slate-950/75 hover:bg-slate-900 border border-slate-800 flex items-center justify-center transition ${currentVer.isFavorite ? 'text-amber-400' : 'text-slate-500 hover:text-slate-300'}" title="Favoritar">
+                        <i data-lucide="star" class="w-4 h-4 ${currentVer.isFavorite ? 'fill-amber-400' : ''}"></i>
+                    </button>
+
+                    <!-- Imagem Frontal Clássica do Personagem (Cabeça até Pernas) -->
+                    <img data-portrait-img="${currentVer.recordId}" alt="${displayTitle}" class="h-44 w-auto object-contain pixelated transform group-hover:scale-105 transition duration-300 drop-shadow-[0_12px_16px_rgba(0,0,0,0.75)] select-none" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+
+                    <!-- Textura 2D Miniatura no Canto Inferior Direito da Vitrine -->
+                    <div class="absolute bottom-2.5 right-3 z-10 w-9 h-9 rounded-lg bg-slate-950/85 border border-slate-800/90 p-1 shadow-md" title="Textura 2D original congelada">
+                        <img data-raw-thumb="${currentVer.recordId}" alt="Raw 2D" class="w-full h-full object-contain pixelated" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+                    </div>
+
+                    <!-- Fading suave na base da vitrine -->
+                    <div class="showcase-vignette absolute inset-x-0 bottom-0 h-16 pointer-events-none"></div>
+                </div>
+
+                <!-- CORPO DE INFORMAÇÕES DO CARD -->
+                <div class="p-4 flex-1 flex flex-col justify-between bg-[#0d1017]">
+                    <div>
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <h3 class="text-sm font-bold text-white truncate" title="${displayTitle}">${escapeHtml(displayTitle)}</h3>
+                                <p class="text-[11px] font-mono text-slate-400 truncate mt-0.5" title="${skinId}">${escapeHtml(subtitleUuid)}</p>
+                            </div>
+                            <span class="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 shrink-0" title="Parâmetro ?t= da versão atual">
+                                ?t=${currentVer.timestampParam === 'sem-timestamp' ? 'padrão' : currentVer.timestampParam.slice(-6)}
+                            </span>
+                        </div>
+
+                        <!-- BARRA DE TROCA DE VERSÕES DIRETO NO CARD (v1, v2, v3 + < >) -->
+                        ${versionSwitcherHtml}
+                    </div>
+
+                    <!-- Botões de Ação Inferiores -->
+                    <div class="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center gap-2">
+                        <button type="button" onclick="open3DModal('${skinId}', ${currentVerIdx})" class="flex-1 py-2 px-3 rounded-xl bg-indigo-600/90 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/15 transition">
+                            <i data-lucide="box" class="w-3.5 h-3.5"></i>
+                            <span>Inspecionar 3D</span>
+                        </button>
+                        <button type="button" onclick="downloadSkinByRecordId(event, '${currentVer.recordId}')" class="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Baixar PNG desta versão (v${currentVerIdx + 1})">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Troca imediatamente a versão exibida no Card SEM abrir o modal 3D!
+        window.switchCardVersion = function(event, skinId, targetVersionIdx) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+
+            const versions = allRecords
+                .filter(r => r.skinId === skinId)
+                .sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+
+            if (!versions.length) return;
+            const safeIdx = Math.max(0, Math.min(targetVersionIdx, versions.length - 1));
+            activeCardVersionMap.set(skinId, safeIdx);
+
+            // Localiza o card específico no DOM e atualiza somente ele em tempo real
+            const cardEl = document.querySelector(`article[data-card-key="group_${CSS.escape(skinId)}"]`);
+            if (!cardEl) return;
+
+            const entry = {
+                isGroupCard: true,
+                skinId,
+                versions,
+                customLabel: versions.find(v => v.customLabel)?.customLabel || ''
+            };
+
+            cardEl.innerHTML = buildCardInnerHtml(entry, safeIdx);
+            cardEl.dataset.recordId = versions[safeIdx].recordId;
+            hydrateCardPortraitAsync(cardEl, versions[safeIdx]);
+            lucide.createIcons({ nodes: [cardEl] });
+        };
+
+        function observeCardForPortraitHydration(cardEl, recordMeta) {
+            if (!('IntersectionObserver' in window)) {
+                hydrateCardPortraitAsync(cardEl, recordMeta);
+                return;
+            }
+            if (!cardIntersectionObserver) {
+                cardIntersectionObserver = new IntersectionObserver((entries, obs) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const el = entry.target;
+                            obs.unobserve(el);
+                            const recId = el.dataset.recordId;
+                            const rec = allRecords.find(r => r.recordId === recId);
+                            if (rec) hydrateCardPortraitAsync(el, rec);
+                        }
+                    });
+                }, { rootMargin: '240px 0px' });
+            }
+            cardIntersectionObserver.observe(cardEl);
+        }
+
+        // Carrega ou gera o retrato clássico frontal a partir do banco IndexedDB
+        async function hydrateCardPortraitAsync(cardEl, recordMeta) {
+            const texObj = await getTextureFromDB(recordMeta.recordId);
+            if (!texObj || !texObj.frozenDataUrl) return;
+
+            let portraitUrl = texObj.portraitDataUrl;
+            if (!portraitUrl) {
+                try {
+                    const img = await loadImageFromDataUrlOrRemote(texObj.frozenDataUrl);
+                    portraitUrl = generateClassicFrontPortrait(img);
+                    portraitMemoryCache.set(recordMeta.recordId, portraitUrl);
+                    await saveRecordAndTextureToDB(recordMeta, texObj.frozenDataUrl, portraitUrl);
+                } catch (e) {
+                    portraitUrl = texObj.frozenDataUrl;
+                }
+            }
+
+            const portraitImg = cardEl.querySelector(`img[data-portrait-img="${CSS.escape(recordMeta.recordId)}"]`);
+            if (portraitImg) portraitImg.src = portraitUrl;
+
+            const rawThumb = cardEl.querySelector(`img[data-raw-thumb="${CSS.escape(recordMeta.recordId)}"]`);
+            if (rawThumb) rawThumb.src = texObj.frozenDataUrl;
+        }
+
+        /**************************************************************************
+         * 6. AÇÕES RÁPIDAS DO CARD (FAVORITAR, DOWNLOAD, DEDUPLICAÇÃO MANUAL)
+         **************************************************************************/
+        window.toggleFavoriteOnCard = async function(event, recordId, skinId) {
+            if (event) event.stopPropagation();
+            const rec = allRecords.find(r => r.recordId === recordId);
+            if (!rec) return;
+            rec.isFavorite = !rec.isFavorite;
+            await updateRecordMetaInDB(rec);
+
+            updateStatsBar();
+            const currentIdx = activeCardVersionMap.get(skinId) || 0;
+            window.switchCardVersion(null, skinId, currentIdx);
+        };
+
+        window.downloadSkinByRecordId = async function(event, recordId) {
+            if (event) event.stopPropagation();
+            const rec = allRecords.find(r => r.recordId === recordId);
+            const texObj = await getTextureFromDB(recordId);
+            if (!rec || !texObj || !texObj.frozenDataUrl) {
+                showToast('Textura não encontrada.', 'rose');
+                return;
+            }
+            const a = document.createElement('a');
+            const cleanName = (rec.customLabel || rec.skinId).replace(/[^a-zA-Z0-9_-]/g, '_');
+            a.href = texObj.frozenDataUrl;
+            a.download = `${cleanName}_v${rec.versionNumber || 1}_${rec.timestampParam}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast(`Skin v${rec.versionNumber || 1} baixada com sucesso!`, 'emerald');
+        };
+
+        // Botão "Limpar Duplicatas": verifica todos os registros, calcula o pixelHash real caso ausente e mescla skins idênticas do mesmo jogador
+        async function runManualDeduplication() {
+            if (allRecords.length === 0) {
+                showToast('O cofre está vazio.', 'amber');
+                return;
+            }
+
+            showProgress(true, 'Verificando pixels de todas as skins para remover duplicatas...', 0, allRecords.length);
+
+            const seenByPlayer = new Map(); // skinId -> Map<pixelHash, primaryRecord>
+            const toRemoveIds = [];
+
+            // Ordena do mais antigo para o mais novo para preservar a v1 original
+            const sorted = [...allRecords].sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+
+            for (let i = 0; i < sorted.length; i++) {
+                const rec = sorted[i];
+                const texObj = await getTextureFromDB(rec.recordId);
+
+                if (texObj && texObj.frozenDataUrl && (!rec.pixelHash || rec.pixelHash.length < 10)) {
+                    try {
+                        const img = await loadImageFromDataUrlOrRemote(texObj.frozenDataUrl);
+                        const info = computePixelHashAndDimensions(img);
+                        rec.pixelHash = info.pixelHash;
+                        rec.width = info.width;
+                        rec.height = info.height;
+                        rec.isHD = info.isHD;
+                        await updateRecordMetaInDB(rec);
+                    } catch (e) {}
+                }
+
+                if (!seenByPlayer.has(rec.skinId)) {
+                    seenByPlayer.set(rec.skinId, new Map());
+                }
+                const playerMap = seenByPlayer.get(rec.skinId);
+                const hashKey = rec.pixelHash || rec.recordId;
+
+                if (playerMap.has(hashKey)) {
+                    const primary = playerMap.get(hashKey);
+                    if (rec.customLabel && !primary.customLabel) {
+                        primary.customLabel = rec.customLabel;
+                        await updateRecordMetaInDB(primary);
+                    }
+                    if (rec.isFavorite && !primary.isFavorite) {
+                        primary.isFavorite = true;
+                        await updateRecordMetaInDB(primary);
+                    }
+                    toRemoveIds.push(rec.recordId);
+                } else {
+                    playerMap.set(hashKey, rec);
+                }
+
+                if (i % 15 === 0) {
+                    showProgress(true, `Auditando pixels (${i + 1}/${sorted.length})...`, i + 1, sorted.length);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            for (const remId of toRemoveIds) {
+                await deleteRecordFromDB(remId);
+            }
+
+            if (toRemoveIds.length > 0) {
+                totalDuplicatesFilteredCount += toRemoveIds.length;
+                const removeSet = new Set(toRemoveIds);
+                allRecords = allRecords.filter(r => !removeSet.has(r.recordId));
+                const uniqueSkinIds = new Set(allRecords.map(r => r.skinId));
+                uniqueSkinIds.forEach(id => recalculateVersionNumbersForSkinId(id));
+            }
+
+            showProgress(false);
+            updateStatsBar();
+            resetAndRenderGallery();
+
+            if (toRemoveIds.length > 0) {
+                showToast(`${toRemoveIds.length} versões duplicadas com pixels idênticos foram mescladas!`, 'emerald');
+            } else {
+                showToast('Nenhuma duplicata encontrada! Todas as versões possuem pixels únicos.', 'indigo');
+            }
+        }
+
+        /**************************************************************************
+         * 7. EXPORTAÇÃO DE BACKUP JSON 100% COMPATÍVEL
+         **************************************************************************/
+        async function exportBackupJson() {
+            if (allRecords.length === 0) {
+                showToast('Não há skins salvas para exportar.', 'amber');
+                return;
+            }
+
+            showProgress(true, 'Empacotando backup JSON compatível...', 0, allRecords.length);
+            const exportArray = [];
+
+            for (let i = 0; i < allRecords.length; i++) {
+                const rec = allRecords[i];
+                const texObj = await getTextureFromDB(rec.recordId);
+                exportArray.push({
+                    ...rec,
+                    frozenDataUrl: texObj ? texObj.frozenDataUrl : null
+                });
+
+                if (i % 25 === 0) {
+                    showProgress(true, `Exportando skin ${i + 1} de ${allRecords.length}...`, i + 1, allRecords.length);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            showProgress(false);
+
+            const jsonStr = JSON.stringify(exportArray, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `somake_skinvault_backup_${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`Backup exportado com ${exportArray.length} skins!`, 'emerald');
+        }
+
+        /**************************************************************************
+         * 8. VISUALIZADOR 3D INTERATIVO (THREE.JS SINGLETON)
+         **************************************************************************/
+        let scene3D, camera3D, renderer3D, playerGroup3D;
+        let headPivot, bodyMesh, rightArmPivot, leftArmPivot, rightLegPivot, leftLegPivot;
+        let outerLayerMeshes = [];
+        let animMode3D = 'walk';
+        let isOuterLayerVisible = true;
+        let isSlimModel = false;
+        let animFrameId = null;
+
+        let isDragging3D = false;
+        let prevMouse = { x: 0, y: 0 };
+        let targetRotY = 0.45;
+        let targetRotX = 0.12;
+
+        function initThreeJSViewer() {
+            if (renderer3D) return;
+            const container = document.getElementById('threeCanvasContainer');
+            const w = container.clientWidth || 500;
+            const h = container.clientHeight || 460;
+
+            scene3D = new THREE.Scene();
+            camera3D = new THREE.PerspectiveCamera(38, w / h, 0.1, 1000);
+            camera3D.position.set(0, 1.5, 42);
+
+            renderer3D = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer3D.setSize(w, h);
+            renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.innerHTML = '';
+            container.appendChild(renderer3D.domElement);
+
+            const ambLight = new THREE.AmbientLight(0xffffff, 0.85);
+            scene3D.add(ambLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.55);
+            dirLight1.position.set(25, 40, 35);
+            scene3D.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0x818cf8, 0.25);
+            dirLight2.position.set(-25, -15, -30);
+            scene3D.add(dirLight2);
+
+            playerGroup3D = new THREE.Group();
+            scene3D.add(playerGroup3D);
+
+            // Controles de rotação e zoom por mouse/touch
+            const domEl = renderer3D.domElement;
+            domEl.addEventListener('pointerdown', (e) => {
+                isDragging3D = true;
+                prevMouse = { x: e.clientX, y: e.clientY };
+            });
+            window.addEventListener('pointerup', () => { isDragging3D = false; });
+            window.addEventListener('pointermove', (e) => {
+                if (!isDragging3D) return;
+                const dx = e.clientX - prevMouse.x;
+                const dy = e.clientY - prevMouse.y;
+                targetRotY += dx * 0.011;
+                targetRotX = Math.max(-1.1, Math.min(1.1, targetRotX + dy * 0.01));
+                prevMouse = { x: e.clientX, y: e.clientY };
+            });
+            domEl.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camera3D.position.z = Math.max(24, Math.min(68, camera3D.position.z + e.deltaY * 0.03));
+            }, { passive: false });
+
+            window.addEventListener('resize', () => {
+                if (!renderer3D || document.getElementById('viewer3DModal').classList.contains('hidden')) return;
+                const nw = container.clientWidth || 500;
+                const nh = container.clientHeight || 460;
+                camera3D.aspect = nw / nh;
+                camera3D.updateProjectionMatrix();
+                renderer3D.setSize(nw, nh);
+            });
+        }
+
+        // Mapeamento UV preciso de cubos no padrão Minecraft (64x64 ou HD proporcional)
+        function applyMinecraftBoxUVs(geometry, u, v, w, h, d, texW = 64, texH = 64) {
+            const uvAttr = geometry.attributes.uv;
+            const faces = [
+                // Right (+x) -> Left na textura do MC
+                [u, v + d, d, h],
+                // Left (-x) -> Right na textura do MC
+                [u + d + w, v + d, d, h],
+                // Top (+y)
+                [u + d, v, w, d],
+                // Bottom (-y)
+                [u + d + w, v, w, d],
+                // Front (+z)
+                [u + d, v + d, w, h],
+                // Back (-z)
+                [u + d + w + d, v + d, w, h]
+            ];
+
+            for (let f = 0; f < 6; f++) {
+                const [fx, fy, fw, fh] = faces[f];
+                const u0 = fx / texW;
+                const u1 = (fx + fw) / texW;
+                const v1 = 1 - (fy / texH);
+                const v0 = 1 - ((fy + fh) / texH);
+
+                const idx = f * 4;
+                if (f === 3) {
+                    // Correção de orientação da face inferior
+                    uvAttr.setXY(idx + 0, u0, v0);
+                    uvAttr.setXY(idx + 1, u1, v0);
+                    uvAttr.setXY(idx + 2, u0, v1);
+                    uvAttr.setXY(idx + 3, u1, v1);
+                } else {
+                    uvAttr.setXY(idx + 0, u0, v1);
+                    uvAttr.setXY(idx + 1, u1, v1);
+                    uvAttr.setXY(idx + 2, u0, v0);
+                    uvAttr.setXY(idx + 3, u1, v0);
+                }
+            }
+            uvAttr.needsUpdate = true;
+        }
+
+        function buildCharacter3DMesh(textureImg) {
+            while (playerGroup3D.children.length > 0) {
+                playerGroup3D.remove(playerGroup3D.children[0]);
+            }
+            outerLayerMeshes = [];
+
+            const w = textureImg.naturalWidth || 64;
+            const h = textureImg.naturalHeight || 64;
+            const isLegacy = (h * 2 === w);
+
+            // Se for 64x32 antiga, converte para layout 64x64 em memória
+            const normCanvas = document.createElement('canvas');
+            normCanvas.width = w;
+            normCanvas.height = isLegacy ? w : h;
+            const nCtx = normCanvas.getContext('2d');
+            nCtx.drawImage(textureImg, 0, 0);
+
+            if (isLegacy) {
+                const s = w / 64;
+                // Copia perna e braço direito para esquerdo
+                nCtx.drawImage(textureImg, 4 * s, 16 * s, 16 * s, 16 * s, 16 * s, 48 * s, 16 * s, 16 * s);
+                nCtx.drawImage(textureImg, 40 * s, 16 * s, 16 * s, 16 * s, 32 * s, 48 * s, 16 * s, 16 * s);
+            }
+
+            const texture = new THREE.CanvasTexture(normCanvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            texture.needsUpdate = true;
+
+            const baseMat = new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.9,
+                metalness: 0.05,
+                alphaTest: 0.1,
+                transparent: false
+            });
+
+            const overlayMat = new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.9,
+                metalness: 0.05,
+                transparent: true,
+                alphaTest: 0.05,
+                side: THREE.DoubleSide
+            });
+
+            const armW = isSlimModel ? 3 : 4;
+
+            // 1. Cabeça + Chapéu
+            headPivot = new THREE.Group();
+            headPivot.position.set(0, 6, 0);
+
+            const headGeo = new THREE.BoxGeometry(8, 8, 8);
+            applyMinecraftBoxUVs(headGeo, 0, 0, 8, 8, 8, 64, 64);
+            const headMesh = new THREE.Mesh(headGeo, baseMat);
+            headMesh.position.y = 4;
+            headPivot.add(headMesh);
+
+            const hatGeo = new THREE.BoxGeometry(8.6, 8.6, 8.6);
+            applyMinecraftBoxUVs(hatGeo, 32, 0, 8, 8, 8, 64, 64);
+            const hatMesh = new THREE.Mesh(hatGeo, overlayMat);
+            hatMesh.position.y = 4;
+            hatMesh.visible = isOuterLayerVisible;
+            headPivot.add(hatMesh);
+            outerLayerMeshes.push(hatMesh);
+
+            playerGroup3D.add(headPivot);
+
+            // 2. Tronco + Jaqueta
+            const bodyGeo = new THREE.BoxGeometry(8, 12, 4);
+            applyMinecraftBoxUVs(bodyGeo, 16, 16, 8, 12, 4, 64, 64);
+            bodyMesh = new THREE.Mesh(bodyGeo, baseMat);
+            bodyMesh.position.set(0, 0, 0);
+            playerGroup3D.add(bodyMesh);
+
+            const jacketGeo = new THREE.BoxGeometry(8.5, 12.5, 4.5);
+            applyMinecraftBoxUVs(jacketGeo, 16, 32, 8, 12, 4, 64, 64);
+            const jacketMesh = new THREE.Mesh(jacketGeo, overlayMat);
+            jacketMesh.position.set(0, 0, 0);
+            jacketMesh.visible = isOuterLayerVisible;
+            playerGroup3D.add(jacketMesh);
+            outerLayerMeshes.push(jacketMesh);
+
+            // 3. Braço Direito
+            rightArmPivot = new THREE.Group();
+            rightArmPivot.position.set(-(4 + armW / 2), 6, 0);
+            const rArmGeo = new THREE.BoxGeometry(armW, 12, 4);
+            applyMinecraftBoxUVs(rArmGeo, 40, 16, armW, 12, 4, 64, 64);
+            const rArmMesh = new THREE.Mesh(rArmGeo, baseMat);
+            rArmMesh.position.y = -6;
+            rightArmPivot.add(rArmMesh);
+
+            const rSleeveGeo = new THREE.BoxGeometry(armW + 0.5, 12.5, 4.5);
+            applyMinecraftBoxUVs(rSleeveGeo, 40, 32, armW, 12, 4, 64, 64);
+            const rSleeveMesh = new THREE.Mesh(rSleeveGeo, overlayMat);
+            rSleeveMesh.position.y = -6;
+            rSleeveMesh.visible = isOuterLayerVisible;
+            rightArmPivot.add(rSleeveMesh);
+            outerLayerMeshes.push(rSleeveMesh);
+            playerGroup3D.add(rightArmPivot);
+
+            // 4. Braço Esquerdo
+            leftArmPivot = new THREE.Group();
+            leftArmPivot.position.set(4 + armW / 2, 6, 0);
+            const lArmGeo = new THREE.BoxGeometry(armW, 12, 4);
+            applyMinecraftBoxUVs(lArmGeo, 32, 48, armW, 12, 4, 64, 64);
+            const lArmMesh = new THREE.Mesh(lArmGeo, baseMat);
+            lArmMesh.position.y = -6;
+            leftArmPivot.add(lArmMesh);
+
+            const lSleeveGeo = new THREE.BoxGeometry(armW + 0.5, 12.5, 4.5);
+            applyMinecraftBoxUVs(lSleeveGeo, 48, 48, armW, 12, 4, 64, 64);
+            const lSleeveMesh = new THREE.Mesh(lSleeveGeo, overlayMat);
+            lSleeveMesh.position.y = -6;
+            lSleeveMesh.visible = isOuterLayerVisible;
+            leftArmPivot.add(lSleeveMesh);
+            outerLayerMeshes.push(lSleeveMesh);
+            playerGroup3D.add(leftArmPivot);
+
+            // 5. Perna Direita
+            rightLegPivot = new THREE.Group();
+            rightLegPivot.position.set(-2, -6, 0);
+            const rLegGeo = new THREE.BoxGeometry(4, 12, 4);
+            applyMinecraftBoxUVs(rLegGeo, 0, 16, 4, 12, 4, 64, 64);
+            const rLegMesh = new THREE.Mesh(rLegGeo, baseMat);
+            rLegMesh.position.y = -6;
+            rightLegPivot.add(rLegMesh);
+
+            const rPantsGeo = new THREE.BoxGeometry(4.5, 12.5, 4.5);
+            applyMinecraftBoxUVs(rPantsGeo, 0, 32, 4, 12, 4, 64, 64);
+            const rPantsMesh = new THREE.Mesh(rPantsGeo, overlayMat);
+            rPantsMesh.position.y = -6;
+            rPantsMesh.visible = isOuterLayerVisible;
+            rightLegPivot.add(rPantsMesh);
+            outerLayerMeshes.push(rPantsMesh);
+            playerGroup3D.add(rightLegPivot);
+
+            // 6. Perna Esquerda
+            leftLegPivot = new THREE.Group();
+            leftLegPivot.position.set(2, -6, 0);
+            const lLegGeo = new THREE.BoxGeometry(4, 12, 4);
+            applyMinecraftBoxUVs(lLegGeo, 16, 48, 4, 12, 4, 64, 64);
+            const lLegMesh = new THREE.Mesh(lLegGeo, baseMat);
+            lLegMesh.position.y = -6;
+            leftLegPivot.add(lLegMesh);
+
+            const lPantsGeo = new THREE.BoxGeometry(4.5, 12.5, 4.5);
+            applyMinecraftBoxUVs(lPantsGeo, 0, 48, 4, 12, 4, 64, 64);
+            const lPantsMesh = new THREE.Mesh(lPantsGeo, overlayMat);
+            lPantsMesh.position.y = -6;
+            lPantsMesh.visible = isOuterLayerVisible;
+            leftLegPivot.add(lPantsMesh);
+            outerLayerMeshes.push(lPantsMesh);
+            playerGroup3D.add(leftLegPivot);
+        }
+
+        function animate3DLoop() {
+            if (document.getElementById('viewer3DModal').classList.contains('hidden')) return;
+            animFrameId = requestAnimationFrame(animate3DLoop);
+
+            const t = performance.now() * 0.004;
+            if (playerGroup3D) {
+                playerGroup3D.rotation.y += (targetRotY - playerGroup3D.rotation.y) * 0.14;
+                playerGroup3D.rotation.x += (targetRotX - playerGroup3D.rotation.x) * 0.14;
+
+                if (animMode3D === 'walk') {
+                    rightArmPivot.rotation.x = Math.sin(t) * 0.65;
+                    leftArmPivot.rotation.x = -Math.sin(t) * 0.65;
+                    rightLegPivot.rotation.x = -Math.sin(t) * 0.65;
+                    leftLegPivot.rotation.x = Math.sin(t) * 0.65;
+                    headPivot.rotation.y = Math.sin(t * 0.5) * 0.18;
+                } else if (animMode3D === 'idle') {
+                    rightArmPivot.rotation.x = Math.sin(t * 0.5) * 0.06;
+                    leftArmPivot.rotation.x = -Math.sin(t * 0.5) * 0.06;
+                    rightLegPivot.rotation.x = 0;
+                    leftLegPivot.rotation.x = 0;
+                    headPivot.rotation.y = Math.sin(t * 0.4) * 0.12;
+                } else {
+                    rightArmPivot.rotation.x = 0;
+                    leftArmPivot.rotation.x = 0;
+                    rightLegPivot.rotation.x = 0;
+                    leftLegPivot.rotation.x = 0;
+                    headPivot.rotation.y = 0;
+                }
+            }
+            renderer3D.render(scene3D, camera3D);
+        }
+
+        window.open3DModal = async function(skinId, versionIdx = 0) {
+            currentModalSkinId = skinId;
+            const versions = allRecords
+                .filter(r => r.skinId === skinId)
+                .sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+
+            if (!versions.length) return;
+            currentModalVersionIdx = Math.max(0, Math.min(versionIdx, versions.length - 1));
+
+            const modal = document.getElementById('viewer3DModal');
+            modal.classList.remove('hidden');
+
+            initThreeJSViewer();
+            const container = document.getElementById('threeCanvasContainer');
+            camera3D.aspect = (container.clientWidth || 500) / (container.clientHeight || 460);
+            camera3D.updateProjectionMatrix();
+            renderer3D.setSize(container.clientWidth || 500, container.clientHeight || 460);
+
+            await renderSelectedVersionInModal();
+            cancelAnimationFrame(animFrameId);
+            animate3DLoop();
+        };
+
+        async function renderSelectedVersionInModal() {
+            const versions = allRecords
+                .filter(r => r.skinId === currentModalSkinId)
+                .sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+
+            if (!versions.length) {
+                close3DModal();
+                return;
+            }
+            currentModalVersionIdx = Math.max(0, Math.min(currentModalVersionIdx, versions.length - 1));
+            const currentVer = versions[currentModalVersionIdx];
+
+            // Sincroniza também o card da galeria com a versão inspecionada
+            activeCardVersionMap.set(currentModalSkinId, currentModalVersionIdx);
+            window.switchCardVersion(null, currentModalSkinId, currentModalVersionIdx);
+
+            document.getElementById('modalSkinId').textContent = currentModalSkinId;
+            document.getElementById('modalCustomLabel').value = currentVer.customLabel || '';
+            document.getElementById('modalModelBadge').textContent = `${currentVer.width}x${currentVer.height} • ${isSlimModel ? 'ALEX (3px)' : 'STEVE (4px)'}`;
+            document.getElementById('modalVersionCounterBadge').textContent = `Versão v${currentModalVersionIdx + 1} de ${versions.length}`;
+            document.getElementById('modalVersionTotalText').textContent = `${versions.length} ${versions.length === 1 ? 'versão' : 'versões'}`;
+            document.getElementById('modalTimestampInfo').textContent = `?t=${currentVer.timestampParam}`;
+            document.getElementById('modalPixelHashInfo').textContent = `Hash: ${(currentVer.pixelHash || '').slice(0, 18)}`;
+
+            // Renderiza a lista de versões lateral no modal
+            const listEl = document.getElementById('modalVersionList');
+            listEl.innerHTML = versions.map((v, idx) => {
+                const isSelected = idx === currentModalVersionIdx;
+                return `
+                    <button type="button" onclick="selectModalVersion(${idx})" class="w-full px-3 py-2 rounded-xl border text-left flex items-center justify-between transition ${
+                        isSelected
+                            ? 'bg-indigo-600/25 border-indigo-500 text-white'
+                            : 'bg-slate-900/70 border-slate-800/80 text-slate-300 hover:bg-slate-800'
+                    }">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold ${isSelected ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'}">v${idx + 1}</span>
+                            <span class="text-xs font-mono truncate">?t=${v.timestampParam}</span>
+                        </div>
+                        <span class="text-[10px] font-mono ${v.isHD ? 'text-amber-300' : 'text-slate-400'}">${v.width}x${v.height}</span>
+                    </button>
+                `;
+            }).join('');
+
+            const texObj = await getTextureFromDB(currentVer.recordId);
+            if (texObj && texObj.frozenDataUrl) {
+                document.getElementById('modalRawTextureImg').src = texObj.frozenDataUrl;
+                const img = await loadImageFromDataUrlOrRemote(texObj.frozenDataUrl);
+                buildCharacter3DMesh(img);
+            }
+        }
+
+        window.selectModalVersion = async function(idx) {
+            currentModalVersionIdx = idx;
+            await renderSelectedVersionInModal();
+        };
+
+        window.close3DModal = function() {
+            document.getElementById('viewer3DModal').classList.add('hidden');
+            cancelAnimationFrame(animFrameId);
+        };
+
+        window.set3DAnimation = function(mode) {
+            animMode3D = mode;
+            ['walk', 'idle', 'pose'].forEach(m => {
+                const btn = document.getElementById('btnAnim' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (btn) {
+                    btn.className = (m === mode)
+                        ? 'px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white transition'
+                        : 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition';
+                }
+            });
+        };
+
+        window.toggleOuterLayer3D = function() {
+            isOuterLayerVisible = !isOuterLayerVisible;
+            outerLayerMeshes.forEach(m => { m.visible = isOuterLayerVisible; });
+            const btn = document.getElementById('btnOuterLayer');
+            btn.innerHTML = `<i data-lucide="layers" class="w-3.5 h-3.5"></i><span>Camada 2 (Chapéu/Jaqueta): ${isOuterLayerVisible ? 'ON' : 'OFF'}</span>`;
+            lucide.createIcons({ nodes: [btn] });
+        };
+
+        window.toggleSlimArms3D = async function() {
+            isSlimModel = !isSlimModel;
+            document.getElementById('btnArmType').textContent = isSlimModel ? 'Braços: Slim Alex (3px)' : 'Braços: Clássico (4px)';
+            await renderSelectedVersionInModal();
+        };
+
+        window.saveCustomLabelFromModal = async function() {
+            if (!currentModalSkinId) return;
+            const newLabel = (document.getElementById('modalCustomLabel').value || '').trim();
+            const playerRecords = allRecords.filter(r => r.skinId === currentModalSkinId);
+            for (const rec of playerRecords) {
+                rec.customLabel = newLabel;
+                await updateRecordMetaInDB(rec);
+            }
+            const curIdx = activeCardVersionMap.get(currentModalSkinId) || 0;
+            window.switchCardVersion(null, currentModalSkinId, curIdx);
+            showToast('Nome do jogador salvo em todas as versões!', 'emerald');
+        };
+
+        window.downloadCurrentModalSkin = function() {
+            const versions = allRecords
+                .filter(r => r.skinId === currentModalSkinId)
+                .sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+            const cur = versions[currentModalVersionIdx];
+            if (cur) window.downloadSkinByRecordId(null, cur.recordId);
+        };
+
+        window.copyCurrentModalUrl = function() {
+            const versions = allRecords
+                .filter(r => r.skinId === currentModalSkinId)
+                .sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+            const cur = versions[currentModalVersionIdx];
+            if (!cur) return;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = cur.originalUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('URL original copiada para a área de transferência!', 'indigo');
+        };
+
+        window.deleteCurrentModalVersion = async function() {
+            const versions = allRecords
+                .filter(r => r.skinId === currentModalSkinId)
+                .sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+            const cur = versions[currentModalVersionIdx];
+            if (!cur) return;
+
+            await deleteRecordFromDB(cur.recordId);
+            allRecords = allRecords.filter(r => r.recordId !== cur.recordId);
+            recalculateVersionNumbersForSkinId(currentModalSkinId);
+
+            updateStatsBar();
+            resetAndRenderGallery();
+
+            const remaining = allRecords.filter(r => r.skinId === currentModalSkinId);
+            if (remaining.length === 0) {
+                close3DModal();
+            } else {
+                currentModalVersionIdx = Math.max(0, currentModalVersionIdx - 1);
+                await renderSelectedVersionInModal();
+            }
+            showToast('Versão removida do cofre.', 'rose');
+        };
+
+        /**************************************************************************
+         * 9. GERADOR DE SKINS DEMO (COM MÚLTIPLAS VERSÕES v1, v2, v3 PARA TESTE)
+         **************************************************************************/
+        function createProceduralSkinDataUrl(palette) {
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 64;
+            const ctx = c.getContext('2d');
+
+            // Cabeça
+            ctx.fillStyle = palette.skin;
+            ctx.fillRect(0, 0, 32, 16);
+            // Cabelo / Chapéu
+            ctx.fillStyle = palette.hair;
+            ctx.fillRect(8, 8, 8, 2);
+            ctx.fillRect(40, 8, 8, 3);
+            // Olhos
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(9, 12, 2, 1);
+            ctx.fillRect(13, 12, 2, 1);
+            ctx.fillStyle = palette.eyes;
+            ctx.fillRect(10, 12, 1, 1);
+            ctx.fillRect(13, 12, 1, 1);
+
+            // Camisa / Tronco
+            ctx.fillStyle = palette.shirt;
+            ctx.fillRect(16, 16, 24, 16);
+            // Detalhe Jaqueta
+            ctx.fillStyle = palette.jacket;
+            ctx.fillRect(20, 36, 8, 10);
+
+            // Braços
+            ctx.fillStyle = palette.shirt;
+            ctx.fillRect(40, 16, 16, 12);
+            ctx.fillRect(32, 48, 16, 12);
+            ctx.fillStyle = palette.skin;
+            ctx.fillRect(40, 28, 16, 4);
+            ctx.fillRect(32, 60, 16, 4);
+
+            // Pernas
+            ctx.fillStyle = palette.pants;
+            ctx.fillRect(0, 16, 16, 16);
+            ctx.fillRect(16, 48, 16, 16);
+
+            return c.toDataURL('image/png');
+        }
+
+        async function loadDemoSkins() {
+            const demoPlayers = [
+                {
+                    skinId: '50908ff3-d683-3b2e-9442-b57007c64b0d',
+                    customLabel: 'Dominicc',
+                    versions: [
+                        { ts: '1776128011101', skin: '#f1c27d', hair: '#1e293b', eyes: '#3b82f6', shirt: '#4f46e5', jacket: '#818cf8', pants: '#0f172a' },
+                        { ts: '1776295002310', skin: '#f1c27d', hair: '#1e293b', eyes: '#10b981', shirt: '#dc2626', jacket: '#f87171', pants: '#1e293b' },
+                        { ts: '1776542119880', skin: '#f1c27d', hair: '#f59e0b', eyes: '#8b5cf6', shirt: '#059669', jacket: '#34d399', pants: '#111827' }
+                    ]
+                },
+                {
+                    skinId: 'a91f44c0-77b1-42c8-9a10-cc882109fa12',
+                    customLabel: 'CyberKnight_BR',
+                    versions: [
+                        { ts: '1775100200100', skin: '#e0ac69', hair: '#0f172a', eyes: '#06b6d4', shirt: '#0284c7', jacket: '#38bdf8', pants: '#1e293b' },
+                        { ts: '1775990400500', skin: '#e0ac69', hair: '#e11d48', eyes: '#f43f5e', shirt: '#7c3aed', jacket: '#a78bfa', pants: '#090d16' }
+                    ]
+                }
+            ];
+
+            const syntheticBackup = [];
+            let baseMs = Date.now() - 500000;
+            for (const p of demoPlayers) {
+                for (let i = 0; i < p.versions.length; i++) {
+                    const v = p.versions[i];
+                    const dataUrl = createProceduralSkinDataUrl(v);
+                    syntheticBackup.push({
+                        recordId: `${p.skinId}_${v.ts}`,
+                        skinId: p.skinId,
+                        timestampParam: v.ts,
+                        originalUrl: `https://skins.somake.online/skin/${p.skinId}?t=${v.ts}`,
+                        frozenDataUrl: dataUrl,
+                        width: 64,
+                        height: 64,
+                        isHD: false,
+                        versionNumber: i + 1,
+                        isFavorite: i === p.versions.length - 1,
+                        customLabel: p.customLabel,
+                        addedAt: new Date(baseMs).toLocaleString('pt-BR'),
+                        createdAtMs: baseMs
+                    });
+                    baseMs += 10000;
+                }
+            }
+
+            await importParsedBackupJson(syntheticBackup, 'Skins Demo');
+        }
+
+        /**************************************************************************
+         * 10. UTILITÁRIOS DE INTERFACE, ESTATÍSTICAS E INICIALIZAÇÃO
+         **************************************************************************/
+        function updateStatsBar() {
+            const groupsMap = getGroupedPlayersMap();
+            const uniquePlayers = groupsMap.size;
+            const totalVersions = allRecords.length;
+
+            let multiCount = 0;
+            let favCount = 0;
+            let labeledCount = 0;
+
+            for (const [, versions] of groupsMap.entries()) {
+                if (versions.length > 1) multiCount++;
+                if (versions.some(v => v.isFavorite)) favCount++;
+                if (versions.some(v => v.customLabel)) labeledCount++;
+            }
+
+            document.getElementById('statUniqueIds').textContent = uniquePlayers;
+            document.getElementById('statTotalVersions').textContent = totalVersions;
+            document.getElementById('statDuplicatesFiltered').textContent = totalDuplicatesFilteredCount;
+            document.getElementById('statHdSkins').textContent = totalVersions;
+
+            // Atualiza os contadores ao vivo nos filtros da Sidebar
+            const cAll = document.getElementById('countFilter_all');
+            const cMulti = document.getElementById('countFilter_multi');
+            const cFav = document.getElementById('countFilter_favorites');
+            const cLab = document.getElementById('countFilter_labeled');
+
+            if (cAll) cAll.textContent = groupingMode === 'grouped' ? uniquePlayers : totalVersions;
+            if (cMulti) cMulti.textContent = multiCount;
+            if (cFav) cFav.textContent = favCount;
+            if (cLab) cLab.textContent = labeledCount;
+        }
+
+        function showProgress(visible, text = '', current = 0, total = 1) {
+            const container = document.getElementById('batchProgressContainer');
+            if (!visible) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+            document.getElementById('batchProgressText').innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                <span>${escapeHtml(text)}</span>
+            `;
+            document.getElementById('batchProgressCount').textContent = `${current} / ${total}`;
+            const pct = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+            document.getElementById('batchProgressBar').style.width = `${pct}%`;
+        }
+
+        function showToast(message, color = 'indigo') {
+            const container = document.getElementById('toastContainer');
+            const colorClasses = {
+                emerald: 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200',
+                rose: 'bg-rose-950/95 border-rose-500/40 text-rose-200',
+                amber: 'bg-amber-950/95 border-amber-500/40 text-amber-200',
+                indigo: 'bg-slate-900/95 border-indigo-500/40 text-indigo-200'
+            };
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-xl text-xs font-medium flex items-center justify-between gap-3 backdrop-blur-md transition-all duration-300 ${colorClasses[color] || colorClasses.indigo}`;
+            toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 4200);
+        }
+
+        function openConfirmClearModal() {
+            document.getElementById('confirmClearModal').classList.remove('hidden');
+        }
+        function closeConfirmClearModal() {
+            document.getElementById('confirmClearModal').classList.add('hidden');
+        }
+        async function confirmClearAllData() {
+            closeConfirmClearModal();
+            const db = await openDatabase();
+            await new Promise((resolve) => {
+                const tx = db.transaction([STORE_RECORDS, STORE_TEXTURES], 'readwrite');
+                tx.objectStore(STORE_RECORDS).clear();
+                tx.objectStore(STORE_TEXTURES).clear();
+                tx.oncomplete = () => resolve();
+            });
+            allRecords = [];
+            textureMemoryCache.clear();
+            portraitMemoryCache.clear();
+            activeCardVersionMap.clear();
+            updateStatsBar();
+            resetAndRenderGallery();
+            showToast('Cofre local limpo com sucesso.', 'rose');
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Configura eventos de Drag & Drop na área principal
+        function setupDragAndDrop() {
+            const dz = document.getElementById('dropZone');
+            ['dragenter', 'dragover'].forEach(ev => {
+                dz.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    dz.classList.add('border-indigo-500', 'bg-indigo-950/20');
+                });
+            });
+            ['dragleave', 'drop'].forEach(ev => {
+                dz.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    dz.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+                });
+            });
+            dz.addEventListener('drop', (e) => {
+                if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+                    handleUniversalFiles(e.dataTransfer.files);
+                }
+            });
+        }
+
+        window.onload = async function() {
+            lucide.createIcons();
+            setupDragAndDrop();
+
+            allRecords = await loadAllRecordsFromDB();
+            const uniqueIds = new Set(allRecords.map(r => r.skinId));
+            uniqueIds.forEach(id => {
+                recalculateVersionNumbersForSkinId(id);
+                const count = allRecords.filter(r => r.skinId === id).length;
+                activeCardVersionMap.set(id, Math.max(0, count - 1));
+            });
+
+            updateStatsBar();
+            resetAndRenderGallery();
+        };
+    </script>
+</body>
+</html>
